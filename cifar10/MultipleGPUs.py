@@ -15,7 +15,7 @@ import tensorflow as tf
 import cifar10
 
 batch_size = 128
-max_steps = 1000000 # you can stop intermediently, model save time to time
+max_steps = 10000 # you can stop intermediently, model save time to time
 num_gpus = 2  # up to your device
 
 def tower_loss(scope):
@@ -76,44 +76,44 @@ def train():
                                         staircase=True)
         opt = tf.train.GradientDescentOptimizer(lr)
         # list to store GPU calculation outputs
-    tower_grads = []
-    for i in range(num_gpus):
-        with tf.device('/gpu:%d' % i):
-            with tf.name_scope('%s_%d' % (cifar10.TOWER_NAME,i)) as scope:
-                loss = tower_loss(scope)
-                # make sure all CPU use the same model and params
-                tf.get_variable_scope().reuse_variables()
-                grads = opt.compute_gradients(loss)
-                tower_grads.append(grads)
+        tower_grads = []
+        for i in range(num_gpus):
+            with tf.device('/gpu:%d' % i):
+                with tf.name_scope('%s_%d' % (cifar10.TOWER_NAME,i)) as scope:
+                    loss = tower_loss(scope)
+                    # make sure all CPU use the same model and params
+                    tf.get_variable_scope().reuse_variables()
+                    grads = opt.compute_gradients(loss)
+                    tower_grads.append(grads)
+                    
+        grads = average_gradients(tower_grads)
+        apply_gradient_op = opt.apply_gradients(grads, global_step=global_step)
+        
+        saver = tf.train.Saver(tf.all_variables())
+        init = tf.global_variables_initializer()
+        # True to ensure no runerror cause some steps can only run on CPU
+        sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
+        sess.run(init)
+        # zunbei hao daliang data augumentation training set
+        tf.train.start_queue_runners(sess=sess)
+        
+        for step in range(max_steps):
+            start_time = time.time()
+            _, loss_value = sess.run([apply_gradient_op, loss])
+            duration = time.time() - start_time
+            
+            if step % 10 == 0:
+                num_examples_per_step = batch_size * num_gpus
+                examples_per_sec = num_examples_per_step / duration
+                sec_per_batch = duration / num_gpus
                 
-    grads = average_gradients(tower_grads)
-    apply_gradient_op = opt.apply_gradients(grads, global_step=global_step)
-    
-    saver = tf.train.Saver(tf.all_variables())
-    init = tf.global_variables_initializer()
-    # True to ensure no runerror cause some steps can only run on CPU
-    sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
-    sess.run(init)
-    # zunbei hao daliang data augumentation training set
-    tf.train.start_queue_runners(sess=sess)
-    
-    for step in range(max_steps):
-        start_time = time.time()
-        _, loss_value = sess.run([apply_gradient_op, loss])
-        duration = time.time() - start_time
-        
-    if time % 10 == 0:
-        num_examples_per_step = batch_size * num_gpus
-        examples_per_sec = num_examples_per_step / duration
-        sec_per_batch = duration / num_gpus
-        
-        format_str = ('step %d, loss = %.2f (%.1f example/sec; %3.f '
-                                             'sec/batch)')
-        print(format_str % (step, loss_value, examples_per_sec,
-                            sec_per_batch))
-        
-    if step % 1000 == 0 or (step + 1) == max_steps:
-        saver.save(sess, '/temp/cifar10_train/model.ckpt', global_step=step)
+                format_str = ('step %d, loss = %.2f (%.1f example/sec; %3.f '
+                                                     'sec/batch)')
+                print(format_str % (step, loss_value, examples_per_sec,
+                                    sec_per_batch))
+                
+            if step % 1000 == 0 or (step + 1) == max_steps:
+                saver.save(sess, '/temp/cifar10_train/model.ckpt', global_step=step)
         
 cifar10.maybe_download_and_extract()
 train()
