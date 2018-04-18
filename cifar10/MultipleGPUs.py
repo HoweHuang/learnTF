@@ -67,7 +67,7 @@ def train():
                                       trainable=False)
         num_batches_per_epoch = cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / batch_size
         
-        decay_steps = int(num_batches_per_epoch * cifar10.NUM_EPOCHES_PER_DECAY)
+        decay_steps = int(num_batches_per_epoch * cifar10.NUM_EPOCHS_PER_DECAY)
         
         lr = tf.train.exponential_decay(cifar10.INITIAL_LEARNING_RATE,
                                         global_step,
@@ -107,13 +107,13 @@ def train():
                 examples_per_sec = num_examples_per_step / duration
                 sec_per_batch = duration / num_gpus
                 
-                format_str = ('step %d, loss = %.2f (%.1f example/sec; %3.f '
+                format_str = ('step %d, loss = %.2f (%.1f example/sec; %.3f '
                                                      'sec/batch)')
                 print(format_str % (step, loss_value, examples_per_sec,
                                     sec_per_batch))
                 
             if step % 1000 == 0 or (step + 1) == max_steps:
-                saver.save(sess, '/temp/cifar10_train/model.ckpt', global_step=step)
+                saver.save(sess, '/tmp/cifar10_train/model.ckpt', global_step=step)
         
 cifar10.maybe_download_and_extract()
 train()
